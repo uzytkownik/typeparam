@@ -626,6 +626,22 @@ mod tests {
             _ => panic!("params.commands != Commands::Default")
         }
     }
+
+    #[test]
+    fn simple2() {
+        let params = Params::parse(["simple", "-c", "cfg", "-q", "-p", "path", "-x", "X", "foo"].iter()).unwrap();
+        assert!(params.quiet);
+        assert!(!params.verbose);
+        assert_eq!(params.cfg, "cfg");
+        assert_eq!(params.path, "path");
+        assert_eq!(params.foo, None);
+        assert_eq!(params.n, Some(3));
+        assert_eq!(params.x, 4);
+        match params.command {
+            Commands::Foo => {},
+            _ => panic!("params.commands != Commands::Foo")
+        }
+    }
 }
 
 
