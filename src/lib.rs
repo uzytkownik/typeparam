@@ -1,3 +1,6 @@
+//! Typeparam allows to write argument parsing in typesafe manner 
+
+
 extern crate clap;
 
 #[allow(unused_macros)]
@@ -469,17 +472,17 @@ macro_rules! typeparam_gen_impl {
     ($acc:ident struct $N:ident [@app $app:ident $err:ty] [subcommands => { $($subcmd:tt)* } params => { $($params:tt)* }]) => {
         impl $crate::Command for $N {
             type Error = $err;
-            fn parse<I : IntoIterator<Item = T>, T : Into<$crate::std::ffi::OsString> + Clone>(itr: I) -> Result<Self, $crate::Error<$err>> {
+            fn command() -> $crate::clap::App<'static, 'static> {
                 let app = $crate::clap::App::new(stringify!($app));
                 let app = app.settings(&[
                     $crate::clap::AppSettings::StrictUtf8
                 ]);
                 let app = typeparam_gen_commands!((app) $($subcmd)*);
                 let app = typeparam_gen_params!((app) $($params)*);
-                let matches = app.get_matches_from_safe(itr).map_err(|e| $crate::Error::Parse(e))?;
-                let fun = move || typeparam_gen_new!((&matches) $N $err {} [subcommands => { $($subcmd)* } params => { $($params) * }]);
-                let result: Result<Self, Self::Error> = fun();
-                result.map_err(|e| $crate::Error::Command(e))
+                app
+            }
+            fn new(matches: &$crate::clap::ArgMatches) -> Result<Self, Self::Error> {
+                typeparam_gen_new!((&matches) $N $err {} [subcommands => { $($subcmd)* } params => { $($params) * }])
             }
         }
     };
@@ -543,7 +546,11 @@ pub enum Error<T> {
 
 pub trait Command where Self : Sized {
     type Error;
-    fn parse<I : IntoIterator<Item = T>, T : Into<std::ffi::OsString> + Clone>(itr: I) -> Result<Self, Error<Self::Error>>;
+    fn command() -> clap::App<'static, 'static>;
+    fn new(mch: &clap::ArgMatches) -> Result<Self, Self::Error>;
+    fn parse<I : IntoIterator<Item = T>, T : Into<std::ffi::OsString> + Clone>(itr: I) -> Result<Self, Error<Self::Error>> {
+        Self::new(&Self::command().get_matches_from_safe(itr).map_err(|e| Error::Parse(e))?).map_err(|e| Error::Command(e))
+    }
     fn parse_args() -> Result<Self, Error<Self::Error>> {
         Self::parse(std::env::args())
     }
@@ -556,6 +563,22 @@ pub trait Command where Self : Sized {
     }
     fn parse_any_args<E : From<Self::Error> + From<clap::Error>>() -> Result<Self, E> {
         Self::parse_any(std::env::args())
+    }
+    fn parse_or_exit<I : IntoIterator<Item = T>, T : Into<std::ffi::OsString> + Clone>(itr: I) -> Self where Self::Error : std::fmt::Display {
+        let mut app = Self::command();
+        let res = app.get_matches_from_safe_borrow(itr).map_err(|e| Error::Parse(e)).and_then(|mch| {
+            Self::new(&mch).map_err(|e| Error::Command(e))
+        });
+        match res {
+            Ok(res) => res,
+            Err(Error::Parse(e)) => e.exit(),
+            Err(Error::Command(e)) => {
+                use std::io::Write;
+                let stderr = std::io::stderr();
+                writeln!(&mut stderr.lock(), "{:}", e).unwrap();
+                std::process::exit(1)
+            }
+        }
     }
 }
 
