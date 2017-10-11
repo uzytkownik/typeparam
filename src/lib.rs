@@ -9,7 +9,7 @@
 //!
 //! # Example
 //!
-//! ```rust,no_run
+//! ```ignore
 //! typeparam!{
 //!     struct Params [@app test ::std::string::ParseError] {
 //!         quiet: bool [QUIET: -q],
