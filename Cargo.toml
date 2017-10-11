@@ -1,0 +1,7 @@
+[package]
+name = "typeparam"
+version = "0.1.0"
+authors = ["Maciej Piechotka <uzytkownik2@gmail.com>"]
+
+[dependencies]
+clap = "2.26.2"
