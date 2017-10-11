@@ -1,4 +1,59 @@
-//! Typeparam allows to write argument parsing in typesafe manner 
+//! TypeParam allows to write argument parsing in typesafe manner.
+//!
+//! TypeParam is a macro taking an annotated structure and generating a structure
+//! and implementation for parsing. Internally it uses
+//! [clap](https://crates.io/crates/clap).
+//!
+//! Please note that it is in very early stage of development and not all features
+//! are implemented.
+//!
+//! # Example
+//!
+//! ```
+//! typeparam!{
+//!     struct Params [@app test ::std::string::ParseError] {
+//!         quiet: bool [QUIET: -q],
+//!         verbose: bool [VERBOSE: -v (value: flag)],
+//!         cfg: String [CFG: -c (value: default String::from("---"))],
+//!         path: String [PATH: -p (value: required)],
+//!         foo: Option<String> [FOO: --foo (value: optional)],
+//!         n: Option<u32> [N: -n (value: option map (|_v| Some(3)))],
+//!         x: u32 [X: -x (value: map (|_| 4))],
+//!         command: @SUBCOMMANDS<Commands> [list => List(List),
+//!                                          get => Get2(Get),
+//!                                          foo => Foo: (default = Default)]
+//!     }
+//!     struct List [@subcommand ::std::string::ParseError];
+//!     struct Get [@subcommand ::std::string::ParseError];
+//! }
+//!
+//! fn main() {
+//!     use typeparam::Command;
+//!     let params = Params::parse(["simple", "-v", "--foo", "bar", "-p", "path", "-x", "X"].iter()).unwrap();
+//!     assert!(!params.quiet);
+//!     assert!(params.verbose);
+//!     assert_eq!(params.cfg, "---");
+//!     assert_eq!(params.path, "path");
+//!     assert_eq!(params.foo, Some(String::from("bar")));
+//!     assert_eq!(params.n, Some(3));
+//!     assert_eq!(params.x, 4);
+//!     match params.command {
+//!         Commands::Default => {},
+//!         Commands::List(_) | Commands::Get2(_) | Commands::Foo => {
+//!             panic!("params.commands != Commands::Default")
+//!         }
+//!     }
+//! }
+//! ```
+//!
+//! In following example it created an parsing structure for application named
+//! `test`. Application takes two required arguments - `-p` and `-x` - and
+//! three optional ones - `--cfg`, `--foo` and `-n`. In addition it accepts two
+//! flags - `-q` anf `-v`.
+//!
+//! It accepts optionally one of three commands - `list`, `get` or `foo`.
+//!
+//! After successful parsing it returns a structure containing parsed commands.
 
 
 extern crate clap;
@@ -618,7 +673,7 @@ mod tests {
             foo: Option<String> [FOO: --foo (value: optional)],
             n: Option<u32> [N: -n (value: option map (|_v| Some(3)))],
             x: u32 [X: -x (value: map (|_| 4))],
-            command: @SUBCOMMANDS<Commands> [list => List(List), get => Get(Get), foo => Foo: (default = Default)]
+            command: @SUBCOMMANDS<Commands> [list => List(List), get => Get2(Get), foo => Foo: (default = Default)]
         }
         struct List [@subcommand ::std::string::ParseError];
         struct Get [@subcommand ::std::string::ParseError];
@@ -649,7 +704,7 @@ mod tests {
         assert_eq!(params.x, 4);
         match params.command {
             Commands::Default => {},
-            _ => panic!("params.commands != Commands::Default")
+            Commands::List(_) | Commands::Get2(_) | Commands::Foo => panic!("params.commands != Commands::Default")
         }
     }
 
