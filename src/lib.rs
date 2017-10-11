@@ -580,6 +580,9 @@ pub trait Command where Self : Sized {
             }
         }
     }
+    fn parse_args_or_exit() -> Self where Self::Error : std::fmt::Display {
+        Self::parse_or_exit(std::env::args())
+    }
 }
 
 pub trait SubCommand where Self : Sized {
