@@ -2,6 +2,18 @@
 name = "typeparam"
 version = "0.0.0"
 authors = ["Maciej Piechotka <uzytkownik2@gmail.com>"]
+description = "A typesafe parameter parsing library"
+homepage = "https://github.com/uzytkownik/typeparam"
+repository = "https://github.com/uzytkownik/typeparam.git"
+keywords = ["parser", "argument", "command", "parse", "arg"]
+categories = ["command-line-interface"]
+license = "MIT"
+
 
 [dependencies]
 clap = "2.26.2"
+
+[badges]
+travis-ci = { repository = "uzytkownik/typeparam" }
+maintenance = { status = "experimental" }
+coveralls = { repository = "uzytkownik/typeparam" }
