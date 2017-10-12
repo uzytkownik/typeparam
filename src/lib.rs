@@ -9,7 +9,10 @@
 //!
 //! # Example
 //!
-//! ```ignore
+//! ```
+//! #[macro_use]
+//! extern crate typeparam;
+//! extern crate clap;
 //! typeparam!{
 //!     struct Params [@app test ::std::string::ParseError] {
 //!         quiet: bool [QUIET: -q],
@@ -26,6 +29,18 @@
 //!     struct List [@subcommand ::std::string::ParseError];
 //!     struct Get [@subcommand ::std::string::ParseError];
 //! }
+//! 
+//! # // TODO: Autogenerate it
+//! # impl ::std::fmt::Debug for List {
+//! #    fn fmt(&self, fmt: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+//! #        fmt.debug_struct("List").finish()
+//! #    }
+//! # }
+//! # impl ::std::fmt::Debug for Get {
+//! #    fn fmt(&self, fmt: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+//! #        fmt.debug_struct("Get").finish()
+//! #    }
+//! # }
 //!
 //! fn main() {
 //!     use typeparam::Command;
@@ -58,7 +73,13 @@
 
 extern crate clap;
 
-#[allow(unused_macros)]
+#[doc(hidden)]
+pub mod clap_export {
+    pub use ::clap::{App,AppSettings,Arg,ArgMatches,SubCommand};
+}
+
+#[doc(hidden)]
+#[macro_export]
 macro_rules! typeparam_sanatize_struct_param {
     ({$($data:tt)*} {{} {$($long:tt)*} {$($value:tt)*}} -$s:ident $($tail:tt)*) => {
         typeparam_sanatize_struct_param!{
@@ -124,7 +145,8 @@ macro_rules! typeparam_sanatize_struct_param {
     };
 }
 
-#[allow(unused_macros)]
+#[doc(hidden)]
+#[macro_export]
 macro_rules! typeparam_sanatize_struct_param_finish {
     (
         [$acc:ident struct $N:ident [$($md:tt)*] {
@@ -148,7 +170,8 @@ macro_rules! typeparam_sanatize_struct_param_finish {
     };
 }
 
-#[allow(unused_macros)]
+#[doc(hidden)]
+#[macro_export]
 macro_rules! typeparam_sanatize_struct_subcommand {
     ({$($data:tt)*} {{} {$($params:tt)*}} $param:ident => $en:ident, $($tail:tt)*) => {
         typeparam_sanatize_struct_subcommand!{{$($data)*} {{} {$($params)* (@subcmd $param ($en) ($crate::EmptySubcommand))}} # $($tail)*}
@@ -198,7 +221,8 @@ macro_rules! typeparam_sanatize_struct_subcommand {
     };
 }
 
-#[allow(unused_macros)]
+#[doc(hidden)]
+#[macro_export]
 macro_rules! typeparam_sanatize_struct {
     ($acc:ident struct $N:ident [$($md:tt)*] { } [$($map:tt)*]) => {
         typeparam_gen_struct!{$acc struct $N [$($md)*] [$($map)*]}
@@ -302,7 +326,8 @@ macro_rules! typeparam_sanatize_struct {
     };
 }
 
-#[allow(unused_macros)]
+#[doc(hidden)]
+#[macro_export]
 macro_rules! typeparam_gen_enum {
     () => {};
     (PRIV $F:ident $T:ident { $def:ident } {$((@subcmd $param:ident ($($el:tt)*) ($typ:ty)))*}) => {
@@ -333,7 +358,8 @@ macro_rules! typeparam_gen_enum {
     };
 }
 
-#[allow(unused_macros)]
+#[doc(hidden)]
+#[macro_export]
 macro_rules! typeparam_gen_struct_hlp {
     (PRIV struct $N:ident {$($fields:tt)*}) => {
         struct $N {
@@ -347,15 +373,16 @@ macro_rules! typeparam_gen_struct_hlp {
     };
 }
 
-#[allow(unused_macros)]
+#[doc(hidden)]
+#[macro_export]
 macro_rules! typeparam_gen_commands {
     (($app:expr)) => {$app};
     (($app:expr) $facc:ident $F:ident $T:ident { $($def:tt)+ } { }) => {$app};
     (($app:expr) $facc:ident $F:ident $T:ident { } { }) => {
-        $app.setting($crate::clap::AppSettings::SubcommandRequired)
+        $app.setting($crate::clap_export::AppSettings::SubcommandRequired)
     };
     (($app:expr) $facc:ident $F:ident $T:ident { $($def:tt)* } {(@subcmd $subcmd:ident ($($fld:tt)*) ($t:ty)) $($tail:tt)*}) => {{
-        fn subcommand<T : $crate::SubCommand>(name: &'static str) -> $crate::clap::App<'static, 'static> {
+        fn subcommand<T : $crate::SubCommand>(name: &'static str) -> $crate::clap_export::App<'static, 'static> {
             T::subcommand(name)
         }
         let app = $app.subcommand(subcommand::<$t>(stringify!($subcmd)));
@@ -363,7 +390,8 @@ macro_rules! typeparam_gen_commands {
     }}
 }
 
-#[allow(unused_macros)]
+#[doc(hidden)]
+#[macro_export]
 macro_rules! typeparam_gen_params_flg {
     (($arg:expr) {$short:ident} {$($long:tt)*}) => {{
         let arg = $arg.short(stringify!($short));
@@ -378,7 +406,8 @@ macro_rules! typeparam_gen_params_flg {
     };
 }
 
-#[allow(unused_macros)]
+#[doc(hidden)]
+#[macro_export]
 macro_rules! typeparam_gen_params {
     (($app:expr) ($facc:ident $F:ident $n:ident $T:ty {$($short:tt)*} {$($long:tt)*} {flag}) $($tail:tt)*) => {{
         let arg = typeparam_gen_params_flg!((::clap::Arg::with_name(stringify!($n))) {$($short)*} {$($long)*});
@@ -408,7 +437,8 @@ macro_rules! typeparam_gen_params {
 }
 
 #[derive(Copy, Clone, Debug)]
-struct Res<T, E>(Result<T, E>);
+#[doc(hidden)]
+pub struct Res<T, E>(pub Result<T, E>);
 
 impl<T, E> From<T> for Res<T, E> {
     fn from(t: T) -> Res<T, E> {
@@ -425,7 +455,8 @@ impl<T, E2, E : Into<E2>> From<Result<T, E>> for Res<T, E2> {
     }
 }
 
-#[allow(unused_macros)]
+#[doc(hidden)]
+#[macro_export]
 macro_rules! typeparam_gen_new_param_get {
     (($match:expr) ($err:ty) $facc:ident $F:ident $n:ident $T:ty {$($short:tt)*} {$($long:tt)*} {flag}) => {
         $match.is_present(stringify!($n))
@@ -470,12 +501,13 @@ macro_rules! typeparam_gen_new_param_get {
     }};
 }
 
-#[allow(unused_macros)]
+#[doc(hidden)]
+#[macro_export]
 macro_rules! typeparam_gen_new_command_get {
     (($match:expr) $T:ident { $($def:tt)* } { (@subcmd $subcmd:ident ($fld:ident($typ:ty)) ( $typ2:ty)) $($tail:tt)* }) => {{
         let mch = $match;
         if let Some(submatch) = mch.subcommand_matches(stringify!($subcmd)) {
-            fn gen_subcmd<T : $crate::SubCommand>(am: &$crate::clap::ArgMatches) -> Result<T, T::Error> {
+            fn gen_subcmd<T : $crate::SubCommand>(am: &$crate::clap_export::ArgMatches) -> Result<T, T::Error> {
                 T::new(am)
             }
             $T::$fld(gen_subcmd::<$typ>(submatch)?) 
@@ -499,8 +531,8 @@ macro_rules! typeparam_gen_new_command_get {
     };
 }
 
-
-#[allow(unused_macros)]
+#[doc(hidden)]
+#[macro_export]
 macro_rules! typeparam_gen_new {
     (($match:expr) $N:ident $err:ty {$($gen:tt)*} [subcommands => {$facc:ident $F:ident $T:ident { $($def:tt)* } { $($subcmd:tt)*} } params => {$($params:tt)*}]) => {{
         let mch = $match;
@@ -522,21 +554,22 @@ macro_rules! typeparam_gen_new {
     }}
 }
 
-#[allow(unused_macros)]
+#[doc(hidden)]
+#[macro_export]
 macro_rules! typeparam_gen_impl {
     ($acc:ident struct $N:ident [@app $app:ident $err:ty] [subcommands => { $($subcmd:tt)* } params => { $($params:tt)* }]) => {
         impl $crate::Command for $N {
             type Error = $err;
-            fn command() -> $crate::clap::App<'static, 'static> {
-                let app = $crate::clap::App::new(stringify!($app));
+            fn command() -> $crate::clap_export::App<'static, 'static> {
+                let app = $crate::clap_export::App::new(stringify!($app));
                 let app = app.settings(&[
-                    $crate::clap::AppSettings::StrictUtf8
+                    $crate::clap_export::AppSettings::StrictUtf8
                 ]);
                 let app = typeparam_gen_commands!((app) $($subcmd)*);
                 let app = typeparam_gen_params!((app) $($params)*);
                 app
             }
-            fn new(matches: &$crate::clap::ArgMatches) -> Result<Self, Self::Error> {
+            fn new(matches: &$crate::clap_export::ArgMatches) -> Result<Self, Self::Error> {
                 typeparam_gen_new!((&matches) $N $err {} [subcommands => { $($subcmd)* } params => { $($params) * }])
             }
         }
@@ -544,20 +577,21 @@ macro_rules! typeparam_gen_impl {
     ($acc:ident struct $N:ident [@subcommand $err:ty] [subcommands => { $($subcmd:tt)* } params => { $($params:tt)* }]) => {
         impl $crate::SubCommand for $N {
             type Error = $err;
-            fn subcommand(name: &'static str) -> $crate::clap::App<'static, 'static> {
-                let app = $crate::clap::SubCommand::with_name(name);
+            fn subcommand(name: &'static str) -> $crate::clap_export::App<'static, 'static> {
+                let app = $crate::clap_export::SubCommand::with_name(name);
                 let app = typeparam_gen_commands!((app) $($subcmd)*);
                 let app = typeparam_gen_params!((app) $($params)*);
                 app
             }
-            fn new(_am: &$crate::clap::ArgMatches) -> Result<Self, Self::Error> {
+            fn new(_am: &$crate::clap_export::ArgMatches) -> Result<Self, Self::Error> {
                 typeparam_gen_new!((&_am) $N $err {} [subcommands => { $($subcmd)* } params => { $($params) * }])
             }
         } 
     };
 }
 
-#[allow(unused_macros)]
+#[doc(hidden)]
+#[macro_export]
 macro_rules! typeparam_gen_struct {
     ($acc:ident struct $N:ident [$($md:tt)*] [subcommands => { $($subcmd:tt)* } params => { $($params:tt)* } fields => { $($fields:tt)* }]) => {
         typeparam_gen_enum!($($subcmd)*);
