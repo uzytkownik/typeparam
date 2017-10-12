@@ -1,6 +1,6 @@
 [package]
 name = "typeparam"
-version = "0.0.0"
+version = "0.0.1"
 authors = ["Maciej Piechotka <uzytkownik2@gmail.com>"]
 description = "A typesafe parameter parsing library"
 homepage = "https://github.com/uzytkownik/typeparam"
