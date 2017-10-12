@@ -5,7 +5,7 @@
 //! [clap](https://crates.io/crates/clap).
 //!
 //! Please note that it is in very early stage of development and not all features
-//! are implemented.
+//! are implemented. The interface and defaults are subject to change.
 //!
 //! # Example
 //!
@@ -20,7 +20,7 @@
 //!         cfg: String [CFG: -c (value: default String::from("---"))],
 //!         path: String [PATH: -p (value: required)],
 //!         foo: Option<String> [FOO: --foo (value: optional)],
-//!         n: Option<u32> [N: -n (value: option map (|_v| Some(3)))],
+//!         n: Option<u32> [N: -n (value: option map (|_v: Option<&str>| Some(3)))],
 //!         x: u32 [X: -x (value: map (|_| 4))],
 //!         command: @SUBCOMMANDS<Commands> [list => List(List),
 //!                                          get => Get2(Get),
@@ -29,7 +29,7 @@
 //!     struct List [@subcommand ::std::string::ParseError];
 //!     struct Get [@subcommand ::std::string::ParseError];
 //! }
-//! 
+//!
 //! # // TODO: Autogenerate it
 //! # impl ::std::fmt::Debug for List {
 //! #    fn fmt(&self, fmt: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
@@ -41,7 +41,7 @@
 //! #        fmt.debug_struct("Get").finish()
 //! #    }
 //! # }
-//!
+//! #
 //! fn main() {
 //!     use typeparam::Command;
 //!     let params = Params::parse(["simple", "-v", "--foo", "bar", "-p", "path", "-x", "X"].iter()).unwrap();
@@ -69,7 +69,199 @@
 //! It accepts optionally one of three commands - `list`, `get` or `foo`.
 //!
 //! After successful parsing it returns a structure containing parsed commands.
-
+//!
+//! # Structures and Enums
+//!
+//! Currently two types of structures are accepted - apps and subcommands.
+//! Both have the same syntax with exception of the square brackets after type
+//! name.
+//!
+//! Apps need to have `@app` as first token appearing in square bracket followed
+//! by app name and type of error parsing may return.
+//!
+//! Subcommands need to have `@subcommand` as first token followed by type of
+//! error parsing may return.
+//!
+//! # Parameters and Options
+//!
+//! Parameters and options are specified as normal fields in struct followed by
+//! square brackets containing their name. Optionally after the name there can
+//! be colon followed by any number of arguments. Arguments can be specified in
+//! any order.
+//!
+//! To denote a short option a dash with a letter should be specified as argument
+//! (`-l`) while long double dash with an identifier (`--foo`). They are not
+//! mutually exclusive.
+//!
+//! ```
+//! #[macro_use]
+//! extern crate typeparam;
+//! extern crate clap;
+//! typeparam!{
+//!     struct Params [@app test ::std::string::ParseError] {
+//!         foo: bool [FOO: --foo],
+//!         bar: bool [BAR: -b],
+//!         foobar: bool [FOOBAR: -f --foobar]
+//!     }
+//! }
+//!
+//! fn main() {
+//!     use typeparam::Command;
+//!     let params = Params::parse(["simple", "-f", "--foo"].iter()).unwrap();
+//!     assert_eq!(params.foo, true);
+//!     assert_eq!(params.bar, false);
+//!     assert_eq!(params.foobar, true);
+//! }
+//! ```
+//!
+//! If either option is omitted the field denote a positional argument.
+//!
+//! ```
+//! #[macro_use]
+//! extern crate typeparam;
+//! extern crate clap;
+//! typeparam!{
+//!     struct Params [@app test ::std::string::ParseError] {
+//!         foo: String [FOO: (value: required)],
+//!         bar: String [BAR: (value: required)],
+//!         foobar: bool [FOOBAR: -f]
+//!     }
+//! }
+//!
+//! fn main() {
+//!     use typeparam::Command;
+//!     let params = Params::parse(["simple", "foo", "-f", "bar"].iter()).unwrap();
+//!     assert_eq!(params.foo.as_str(), "foo");
+//!     assert_eq!(params.bar.as_str(), "bar");
+//!     assert_eq!(params.foobar, true);
+//! }
+//! ```
+//!
+//! Each option can also take a `value` setting. Currently there are 5 valid
+//! settings:
+//!
+//!   - `value: flag` is default and denotes a single flag - in other words no
+//!     argument. Value returned is [`bool`](bool).
+//!   - `value: required` denotes an required argument. If user does not passes
+//!     it, an error is returned. Otherwise [`fromStr`](std::str::FromStr::from_str)
+//!     is called on value passed by user.
+//!   - `value: optional` denotes an optional argument. If user does not passes
+//!     it [`None`](std::option::Option::None) is returned. Otherwise [`fromStr`](std::str::FromStr::from_str)
+//!     is called on value and wrapped by [`Some`](std::option::Option::Some).
+//!   - `value: map callback` denotes an required argument, just as `value: required`,
+//!      however it allows to supply arbitrary function. Both functions returning value
+//!      directly as well as [`Result`](std::result::Result) are accepted.
+//!   - `value: option map callback` denotes an optional argument, just as
+//!     `value: optional`. However it allows to supply an arbitrary function.
+//!      Both functions returning value directly as well as
+//!      [`Result`](std::result::Result) are accepted.
+//!
+//! # Subcommands
+//! Subcommands functions as nested apps inside the command. This style has been
+//! popularized by (git)[https://git-scm.com/].
+//!
+//! For application (or recursivly subcommand) to have subcommands it is necessary
+//! to add field of type `@SUBCOMMANDS<NameOfEnum>`. There can be at most one such
+//! field in struct.
+//!
+//! ```compile_fail
+//! #[macro_use]
+//! extern crate typeparam;
+//! extern crate clap;
+//! typeparam!{
+//!     struct IllegalParams [@app illegal ::std::string::ParseError] {
+//!         illegal1: @SUBCOMMANDS<Illegal1> [foo => Foo],
+//!         illegal2: @SUBCOMMANDS<Illegal2> [foo => Bar]
+//!     }
+//! }
+//! # fn main() {}
+//! ```
+//!
+//! Afterwards the subcommands are specified in square brackets. There are
+//! two forms of subcommand specification - including type
+//! (`subcommand => Identifier(Type)`) and not (`subcommand => Identifier`).
+//! In the first form a type must be a subcommand and the description of fields
+//! is taken from there. The second form makes a subcommand not to get any
+//! additional fields.
+//! In both cases the `Identifier` is added to the enum specified after `@SUBCOMMAND`
+//! - with single argument or without any arguments respectivly.
+//!
+//! ```
+//! #[macro_use]
+//! extern crate typeparam;
+//! extern crate clap;
+//! typeparam!{
+//!     struct Params [@app test ::std::string::ParseError] {
+//!         command: @SUBCOMMANDS<Commands> [list => List, find => Find(Find)],
+//!         debug: bool [DEBUG: -d (value: flag)]
+//!     }
+//! }
+//! typeparam!{
+//!     struct Find [@subcommand ::std::string::ParseError] {
+//!         name: String [NAME: (value: required)],
+//!         case_insensitive: bool [CASE_INSENSITIVE: -i (value: flag)]
+//!     }
+//! }
+//!
+//! # // TODO: Autogenerate it
+//! # impl ::std::fmt::Debug for Find {
+//! #    fn fmt(&self, fmt: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+//! #        fmt.debug_struct("Find").field("name", &self.name).field("case_insensitive", &self.case_insensitive).finish()
+//! #    }
+//! # }
+//! #
+//! fn main() {
+//!    use typeparam::Command;
+//!    let list = Params::parse(["simple", "-d", "list"].iter()).unwrap();
+//!    assert_eq!(list.debug, true);
+//!    match list.command {
+//!        Commands::List => {},
+//!        _ => panic!("Expected Commands::List")
+//!    }
+//!    let find = Params::parse(["simple", "-d", "find", "-i", "something"].iter()).unwrap();
+//!    assert_eq!(find.debug, true);
+//!    match find.command {
+//!        Commands::Find(find_cmd) => {
+//!            assert_eq!(find_cmd.case_insensitive, true);
+//!            assert_eq!(find_cmd.name.as_str(), "something");
+//!        },
+//!        _ => panic!("Expected Commands::Find(_)")
+//!    }
+//! }
+//! ```
+//!
+//! Optionally they can be followed by colon and any number of arguments passed.
+//! Currently there is only one argument supported - `(default = Value)`. If it is
+//! specified `Value` becomes a value of enum when no command is given. Otherwise
+//! passing a command is required.
+//!
+//! ```
+//! #[macro_use]
+//! extern crate typeparam;
+//! extern crate clap;
+//! typeparam!{
+//!     struct Params [@app test ::std::string::ParseError] {
+//!         command: @SUBCOMMANDS<Commands> [list => List, find => Find(Find)],
+//!         debug: bool [DEBUG: -d (value: flag)]
+//!     }
+//!     struct Find [@subcommand ::std::string::ParseError] {
+//!         name: String [NAME: (value: required)],
+//!         case_insensitive: bool [CASE_INSENSITIVE: -i (value: flag)]
+//!     }
+//! }
+//!
+//! # // TODO: Autogenerate it
+//! # impl ::std::fmt::Debug for Find {
+//! #    fn fmt(&self, fmt: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+//! #        fmt.debug_struct("Find").field("name", &self.name).field("case_insensitive", &self.case_insensitive).finish()
+//! #    }
+//! # }
+//! #
+//! fn main() {
+//!    use typeparam::Command;
+//!    assert!(Params::parse(["simple"].iter()).is_err());
+//! }
+//! ```
 
 extern crate clap;
 
@@ -174,7 +366,7 @@ macro_rules! typeparam_sanatize_struct_param_finish {
 #[macro_export]
 macro_rules! typeparam_sanatize_struct_subcommand {
     ({$($data:tt)*} {{} {$($params:tt)*}} $param:ident => $en:ident, $($tail:tt)*) => {
-        typeparam_sanatize_struct_subcommand!{{$($data)*} {{} {$($params)* (@subcmd $param ($en) ($crate::EmptySubcommand))}} # $($tail)*}
+        typeparam_sanatize_struct_subcommand!{{$($data)*} {{} {$($params)* (@subcmd $param ($en) ($crate::EmptySubcommand))}} $($tail)*}
     };
     ({$($data:tt)*} {{} {$($params:tt)*}} $param:ident => $en:ident($typ:ty), $($tail:tt)*) => {
         typeparam_sanatize_struct_subcommand!{{$($data)*} {{} {$($params)* (@subcmd $param ($en($typ)) ($typ))}} $($tail)*}
@@ -411,15 +603,15 @@ macro_rules! typeparam_gen_params_flg {
 macro_rules! typeparam_gen_params {
     (($app:expr) ($facc:ident $F:ident $n:ident $T:ty {$($short:tt)*} {$($long:tt)*} {flag}) $($tail:tt)*) => {{
         let arg = typeparam_gen_params_flg!((::clap::Arg::with_name(stringify!($n))) {$($short)*} {$($long)*});
-        typeparam_gen_params!(($app.arg(arg)) $($tail)*)
+        typeparam_gen_params!(($app.arg(arg.takes_value(false).required(false))) $($tail)*)
     }};
     (($app:expr) ($facc:ident $F:ident $n:ident $T:ty {$($short:tt)*} {$($long:tt)*} {default $E:expr}) $($tail:tt)*) => {{
         let arg = typeparam_gen_params_flg!((::clap::Arg::with_name(stringify!($n))) {$($short)*} {$($long)*});
-        typeparam_gen_params!(($app.arg(arg.takes_value(true))) $($tail)*)
+        typeparam_gen_params!(($app.arg(arg.takes_value(true).required(false))) $($tail)*)
     }};
     (($app:expr) ($facc:ident $F:ident $n:ident $T:ty {$($short:tt)*} {$($long:tt)*} {optional}) $($tail:tt)*) => {{
         let arg = typeparam_gen_params_flg!((::clap::Arg::with_name(stringify!($n))) {$($short)*} {$($long)*});
-        typeparam_gen_params!(($app.arg(arg.takes_value(true))) $($tail)*)
+        typeparam_gen_params!(($app.arg(arg.takes_value(true).required(false))) $($tail)*)
     }};
     (($app:expr) ($facc:ident $F:ident $n:ident $T:ty {$($short:tt)*} {$($long:tt)*} {required}) $($tail:tt)*) => {{
         let arg = typeparam_gen_params_flg!((::clap::Arg::with_name(stringify!($n))) {$($short)*} {$($long)*});
@@ -427,7 +619,7 @@ macro_rules! typeparam_gen_params {
     }};
     (($app:expr) ($facc:ident $F:ident $n:ident $T:ty {$($short:tt)*} {$($long:tt)*} {option map $E:expr}) $($tail:tt)*) => {{
         let arg = typeparam_gen_params_flg!((::clap::Arg::with_name(stringify!($n))) {$($short)*} {$($long)*});
-        typeparam_gen_params!(($app.arg(arg.takes_value(true))) $($tail)*)
+        typeparam_gen_params!(($app.arg(arg.takes_value(true).required(false))) $($tail)*)
     }};
     (($app:expr) ($facc:ident $F:ident $n:ident $T:ty {$($short:tt)*} {$($long:tt)*} {map $E:expr}) $($tail:tt)*) => {{
         let arg = typeparam_gen_params_flg!((::clap::Arg::with_name(stringify!($n))) {$($short)*} {$($long)*});
@@ -526,8 +718,8 @@ macro_rules! typeparam_gen_new_command_get {
     (($match:expr) $T:ident { $def:ident } { }) => {
         $T::$def
     };
-    (($match:expr, $stack: expr) $T:ident { } { }) => {
-        panic!("No command given") as $T
+    (($match:expr) $T:ident { } { }) => {
+        panic!("No command given")
     };
 }
 
@@ -633,16 +825,33 @@ pub enum Error<T> {
     Command(T)
 }
 
+/// Commands are main result of [`typeparam!`](typeparam!) macro.
 pub trait Command where Self : Sized {
+    /// Error that may be returned by the user part of the process.
     type Error;
-    fn command() -> clap::App<'static, 'static>;
-    fn new(mch: &clap::ArgMatches) -> Result<Self, Self::Error>;
+    /// Starts the automated parsing process with passed iterator.
+    ///
+    /// **NOTE** `--help` and `--version` are returned as errors.
+    ///
+    /// **NOTE** Note that first element of iteration is considered name of
+    /// binary.
     fn parse<I : IntoIterator<Item = T>, T : Into<std::ffi::OsString> + Clone>(itr: I) -> Result<Self, Error<Self::Error>> {
         Self::new(&Self::command().get_matches_from_safe(itr).map_err(|e| Error::Parse(e))?).map_err(|e| Error::Command(e))
     }
+    /// Starts the automated parsing process with commandline arguments.
+    ///
+    /// **NOTE** `--help` and `--version` are returned as errors.
+    ///
+    /// **NOTE** Note that command name is considered just a binary name.
     fn parse_args() -> Result<Self, Error<Self::Error>> {
         Self::parse(std::env::args())
     }
+    /// Starts the automated parsing process with passed iterator.
+    ///
+    /// **NOTE** `--help` and `--version` are returned as errors.
+    ///
+    /// **NOTE** Note that first element of iteration is considered name of
+    /// binary.
     fn parse_any<I : IntoIterator<Item = T>, T : Into<std::ffi::OsString> + Clone, E : From<Self::Error> + From<clap::Error>>(itr: I) -> Result<Self, E> {
         match Self::parse(itr) {
             Ok(res) => Ok(res),
@@ -650,9 +859,18 @@ pub trait Command where Self : Sized {
             Err(Error::Command(e)) => Err(E::from(e))
         }
     }
+    /// Starts the automated parsing process with commandline arguments.
+    ///
+    /// **NOTE** `--help` and `--version` are returned as errors.
+    ///
+    /// **NOTE** Note that command name is considered just a binary name.
     fn parse_any_args<E : From<Self::Error> + From<clap::Error>>() -> Result<Self, E> {
         Self::parse_any(std::env::args())
     }
+    /// Starts the automated parsing process with passed iterator. If parsing
+    /// fails an error is printed and process exits.
+    ///
+    /// **NOTE** Note that command name is considered just a binary name.
     fn parse_or_exit<I : IntoIterator<Item = T>, T : Into<std::ffi::OsString> + Clone>(itr: I) -> Self where Self::Error : std::fmt::Display {
         let mut app = Self::command();
         let res = app.get_matches_from_safe_borrow(itr).map_err(|e| Error::Parse(e)).and_then(|mch| {
@@ -669,11 +887,20 @@ pub trait Command where Self : Sized {
             }
         }
     }
+    /// Starts the automated parsing process with passed iterator. If parsing
+    /// fails an error is printed and process exits.
+    ///
+    /// **NOTE** Note that command name is considered just a binary name.
     fn parse_args_or_exit() -> Self where Self::Error : std::fmt::Display {
         Self::parse_or_exit(std::env::args())
     }
+    /// Creates an [`App`](clap::App) based on specified command
+    fn command() -> clap::App<'static, 'static>;
+    /// Creates structure based on matched arguments.
+    fn new(mch: &clap::ArgMatches) -> Result<Self, Self::Error>;
 }
 
+#[doc(hidden)]
 pub trait SubCommand where Self : Sized {
     type Error;
     fn subcommand(name: &'static str) -> clap::App<'static, 'static>;
@@ -681,6 +908,7 @@ pub trait SubCommand where Self : Sized {
 }
 
 #[derive(Copy, Clone, Debug)]
+#[doc(hidden)]
 pub enum EmptySubcommand {}
 
 impl SubCommand for EmptySubcommand {
@@ -692,71 +920,4 @@ impl SubCommand for EmptySubcommand {
         panic!("EmptySubcommand::new should never be called");
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use ::Command;
-
-    // Compile-time test
-    typeparam!{
-        struct Params [@app test ::std::string::ParseError] {
-            quiet: bool [QUIET: -q],
-            verbose: bool [VERBOSE: -v (value: flag)],
-            cfg: String [CFG: -c (value: default String::from("---"))],
-            path: String [PATH: -p (value: required)],
-            foo: Option<String> [FOO: --foo (value: optional)],
-            n: Option<u32> [N: -n (value: option map (|_v| Some(3)))],
-            x: u32 [X: -x (value: map (|_| 4))],
-            command: @SUBCOMMANDS<Commands> [list => List(List), get => Get2(Get), foo => Foo: (default = Default)]
-        }
-        struct List [@subcommand ::std::string::ParseError];
-        struct Get [@subcommand ::std::string::ParseError];
-    }
-
-    // TODO: Autogenerate it
-    impl ::std::fmt::Debug for List {
-        fn fmt(&self, fmt: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
-            fmt.debug_struct("List").finish()
-        }
-    }
-
-    impl ::std::fmt::Debug for Get {
-        fn fmt(&self, fmt: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
-            fmt.debug_struct("Get").finish()
-        }
-    }
-
-    #[test]
-    fn simple1() {
-        let params = Params::parse(["simple", "-v", "--foo", "bar", "-p", "path", "-x", "X"].iter()).unwrap();
-        assert!(!params.quiet);
-        assert!(params.verbose);
-        assert_eq!(params.cfg, "---");
-        assert_eq!(params.path, "path");
-        assert_eq!(params.foo, Some(String::from("bar")));
-        assert_eq!(params.n, Some(3));
-        assert_eq!(params.x, 4);
-        match params.command {
-            Commands::Default => {},
-            Commands::List(_) | Commands::Get2(_) | Commands::Foo => panic!("params.commands != Commands::Default")
-        }
-    }
-
-    #[test]
-    fn simple2() {
-        let params = Params::parse(["simple", "-c", "cfg", "-q", "-p", "path", "-x", "X", "foo"].iter()).unwrap();
-        assert!(params.quiet);
-        assert!(!params.verbose);
-        assert_eq!(params.cfg, "cfg");
-        assert_eq!(params.path, "path");
-        assert_eq!(params.foo, None);
-        assert_eq!(params.n, Some(3));
-        assert_eq!(params.x, 4);
-        match params.command {
-            Commands::Foo => {},
-            _ => panic!("params.commands != Commands::Foo")
-        }
-    }
-}
-
 
