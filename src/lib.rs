@@ -15,8 +15,9 @@
 //! extern crate clap;
 //! typeparam!{
 //!     struct Params [@app test ::std::string::ParseError] {
-//!         quiet: bool [QUIET: -q],
-//!         verbose: bool [VERBOSE: -v (value: flag)],
+//!         quiet: bool [QUIET: -q (help: "Be quiet")],
+//!         verbose: bool [VERBOSE: -v (value: flag) (long_help: "Print many
+//! lines of output")],
 //!         cfg: String [CFG: -c (value: default String::from("---"))],
 //!         path: String [PATH: -p (value: required)],
 //!         foo: Option<String> [FOO: --foo (value: optional)],
@@ -156,6 +157,8 @@
 //!      Both functions returning value directly as well as
 //!      [`Result`](std::result::Result) are accepted.
 //!
+//! In addition help can be added by `(help: "Help string")` and `(long_help: "Long help")`.
+//!
 //! # Subcommands
 //! Subcommands functions as nested apps inside the command. This style has been
 //! popularized by (git)[https://git-scm.com/].
@@ -273,67 +276,81 @@ pub mod clap_export {
 #[doc(hidden)]
 #[macro_export]
 macro_rules! typeparam_sanatize_struct_param {
-    ({$($data:tt)*} {{} {$($long:tt)*} {$($value:tt)*}} -$s:ident $($tail:tt)*) => {
+    ({$($data:tt)*} {{} {$($long:tt)*} {$($value:tt)*} {$($help:tt)*} {$($long_help:tt)*}} -$s:ident $($tail:tt)*) => {
         typeparam_sanatize_struct_param!{
             {$($data)*}
-            {{$s} {$($long)*} {$($value)*}}
+            {{$s} {$($long)*} {$($value)*} {$($help)*} {$($long_help)*}}
             $($tail)*
         }
     };
-    ({$($data:tt)*} {{$($short:tt)*} {} {$($value:tt)*}} --$l:ident $($tail:tt)*) => {
+    ({$($data:tt)*} {{$($short:tt)*} {} {$($value:tt)*} {$($help:tt)*} {$($long_help:tt)*}} --$l:ident $($tail:tt)*) => {
         typeparam_sanatize_struct_param!{
             {$($data)*}
-            {{$($short)*} {$l} {$($value)*}}
+            {{$($short)*} {$l} {$($value)*} {$($help)*} {$($long_help)*}}
             $($tail)*
         }
     };
-    ({$($data:tt)*} {{$($short:tt)*} {$($long:tt)*} {}} (value: flag) $($tail:tt)*) => {
+    ({$($data:tt)*} {{$($short:tt)*} {$($long:tt)*} {} {$($help:tt)*} {$($long_help:tt)*}} (value: flag) $($tail:tt)*) => {
         typeparam_sanatize_struct_param!{
             {$($data)*}
-            {{$($short)*} {$($long)*} {flag}}
+            {{$($short)*} {$($long)*} {flag} {$($help)*} {$($long_help)*}}
             $($tail)*
         }
     };
-    ({$($data:tt)*} {{$($short:tt)*} {$($long:tt)*} {}} (value: default $E:expr) $($tail:tt)*) => {
+    ({$($data:tt)*} {{$($short:tt)*} {$($long:tt)*} {} {$($help:tt)*} {$($long_help:tt)*}} (value: default $E:expr) $($tail:tt)*) => {
         typeparam_sanatize_struct_param!{
             {$($data)*}
-            {{$($short)*} {$($long)*} {default $E}}
+            {{$($short)*} {$($long)*} {default $E} {$($help)*} {$($long_help)*}}
             $($tail)*
         }
     };
-    ({$($data:tt)*} {{$($short:tt)*} {$($long:tt)*} {}} (value: required) $($tail:tt)*) => {
+    ({$($data:tt)*} {{$($short:tt)*} {$($long:tt)*} {} {$($help:tt)*} {$($long_help:tt)*}} (value: required) $($tail:tt)*) => {
         typeparam_sanatize_struct_param!{
             {$($data)*}
-            {{$($short)*} {$($long)*} {required}}
+            {{$($short)*} {$($long)*} {required} {$($help)*} {$($long_help)*}}
             $($tail)*
         }
     };
-    ({$($data:tt)*} {{$($short:tt)*} {$($long:tt)*} {}} (value: optional) $($tail:tt)*) => {
+    ({$($data:tt)*} {{$($short:tt)*} {$($long:tt)*} {} {$($help:tt)*} {$($long_help:tt)*}} (value: optional) $($tail:tt)*) => {
         typeparam_sanatize_struct_param!{
             {$($data)*}
-            {{$($short)*} {$($long)*} {optional}}
+            {{$($short)*} {$($long)*} {optional} {$($help)*} {$($long_help)*}}
             $($tail)*
         }
     };
-    ({$($data:tt)*} {{$($short:tt)*} {$($long:tt)*} {}} (value: option map $E:expr) $($tail:tt)*) => {
+    ({$($data:tt)*} {{$($short:tt)*} {$($long:tt)*} {} {$($help:tt)*} {$($long_help:tt)*}} (value: option map $E:expr) $($tail:tt)*) => {
         typeparam_sanatize_struct_param!{
             {$($data)*}
-            {{$($short)*} {$($long)*} {option map $E}}
+            {{$($short)*} {$($long)*} {option map $E} {$($help)*} {$($long_help)*}}
             $($tail)*
         }
     };
-    ({$($data:tt)*} {{$($short:tt)*} {$($long:tt)*} {}} (value: map $E:expr) $($tail:tt)*) => {
+    ({$($data:tt)*} {{$($short:tt)*} {$($long:tt)*} {} {$($help:tt)*} {$($long_help:tt)*}} (value: map $E:expr) $($tail:tt)*) => {
         typeparam_sanatize_struct_param!{
             {$($data)*}
-            {{$($short)*} {$($long)*} {map $E}}
+            {{$($short)*} {$($long)*} {map $E} {$($help)*} {$($long_help)*}}
             $($tail)*
         }
     };
-    ({$($data:tt)*} {{$($short:tt)*} {$($long:tt)*} {}}) => {
-        typeparam_sanatize_struct_param_finish!{$($data)* [{$($short)*} {$($long)*} {flag}]}
+    ({$($data:tt)*} {{$($short:tt)*} {$($long:tt)*} {$($value:tt)*} {} {$($long_help:tt)*}} (help: $H:expr) $($tail:tt)*) => {
+        typeparam_sanatize_struct_param!{
+            {$($data)*}
+            {{$($short)*} {$($long)*} {$($value)*} {$H} {$($long_help)*}}
+            $($tail)*
+        }
     };
-    ({$($data:tt)*} {{$($short:tt)*} {$($long:tt)*} {$($value:tt)*}}) => {
-        typeparam_sanatize_struct_param_finish!{$($data)* [{$($short)*} {$($long)*} {$($value)*}]}
+    ({$($data:tt)*} {{$($short:tt)*} {$($long:tt)*} {$($value:tt)*} {$($help:tt)*} {}} (long_help: $H:expr) $($tail:tt)*) => {
+        typeparam_sanatize_struct_param!{
+            {$($data)*}
+            {{$($short)*} {$($long)*} {$($value)*} {$($help)*} {$H}}
+            $($tail)*
+        }
+    };
+    ({$($data:tt)*} {{$($short:tt)*} {$($long:tt)*} {} {$($help:tt)*} {$($long_help:tt)*}}) => {
+        typeparam_sanatize_struct_param_finish!{$($data)* [{$($short)*} {$($long)*} {flag} {$($help)*} {$($long_help)*}]}
+    };
+    ({$($data:tt)*} {{$($short:tt)*} {$($long:tt)*} {$($value:tt)*} {$($help:tt)*} {$($long_help:tt)*}}) => {
+        typeparam_sanatize_struct_param_finish!{$($data)* [{$($short)*} {$($long)*} {$($value)*} {$($help)*} {$($long_help)*}]}
     };
 }
 
@@ -348,14 +365,14 @@ macro_rules! typeparam_sanatize_struct_param_finish {
         [$($suffix:tt)*]
         $facc:ident $F:ident $n:ident $T:ty
         {$($params:tt)*}
-        [{$($short:tt)*} {$($long:tt)*} {$($value:tt)*}]
+        [{$($short:tt)*} {$($long:tt)*} {$($value:tt)*} {$($help:tt)*} {$($long_help:tt)*}]
     ) => {
         typeparam_sanatize_struct!{
             $acc struct $N [$($md)*] {
                 $($tail)*
             } [
                 $($prefix)*
-                params => {$($params)* ($facc $F $n $T {$($short)*} {$($long)*} {$($value)*})}
+                params => {$($params)* ($facc $F $n $T {$($short)*} {$($long)*} {$($value)*} {$($help)*} {$($long_help)*})}
                 $($suffix)*
             ]
         }
@@ -442,7 +459,7 @@ macro_rules! typeparam_sanatize_struct {
                 PRIV $F $n $T
                 {$($params)*}
             }
-            { {} {} {} }
+            { {} {} {} {} {} }
             $($settings)*
         }
     };
@@ -466,7 +483,7 @@ macro_rules! typeparam_sanatize_struct {
                 PUB $F $n $T
                 {$($params)*}
             }
-            { {} {} {} }
+            { {} {} {} {} {} }
             $($settings)*
         }
     };
@@ -585,15 +602,23 @@ macro_rules! typeparam_gen_commands {
 #[doc(hidden)]
 #[macro_export]
 macro_rules! typeparam_gen_params_flg {
-    (($arg:expr) {$short:ident} {$($long:tt)*}) => {{
+    (($arg:expr) {$short:ident} {$($long:tt)*} {$($help:tt)*} {$($long_help:tt)*}) => {{
         let arg = $arg.short(stringify!($short));
-        typeparam_gen_params_flg!((arg) {} {$($long)*})
+        typeparam_gen_params_flg!((arg) {} {$($long)*} {$($help)*} {$($long_help)*})
     }};
-    (($arg:expr) {} {$long:ident}) => {{
+    (($arg:expr) {} {$long:ident} {$($help:tt)*} {$($long_help:tt)*}) => {{
         let arg = $arg.long(stringify!($long));
-        typeparam_gen_params_flg!((arg) {} {})
+        typeparam_gen_params_flg!((arg) {} {} {$($help)*} {$($long_help)*})
     }};
-    (($arg:expr) {} {}) => {
+    (($arg:expr) {} {} {$help:expr} {$($long_help:tt)*}) => {{
+        let arg = $arg.help($help);
+        typeparam_gen_params_flg!((arg) {} {} {} {$($long_help)*})
+    }};
+    (($arg:expr) {} {} {} {$long_help:expr}) => {{
+        let arg = $arg.long_help($long_help);
+        typeparam_gen_params_flg!((arg) {} {} {} {})
+    }};
+    (($arg:expr) {} {} {} {}) => {
         $arg
     };
 }
@@ -601,28 +626,28 @@ macro_rules! typeparam_gen_params_flg {
 #[doc(hidden)]
 #[macro_export]
 macro_rules! typeparam_gen_params {
-    (($app:expr) ($facc:ident $F:ident $n:ident $T:ty {$($short:tt)*} {$($long:tt)*} {flag}) $($tail:tt)*) => {{
-        let arg = typeparam_gen_params_flg!((::clap::Arg::with_name(stringify!($n))) {$($short)*} {$($long)*});
+    (($app:expr) ($facc:ident $F:ident $n:ident $T:ty {$($short:tt)*} {$($long:tt)*} {flag} {$($help:tt)*} {$($long_help:tt)*}) $($tail:tt)*) => {{
+        let arg = typeparam_gen_params_flg!((::clap::Arg::with_name(stringify!($n))) {$($short)*} {$($long)*} {$($help)*} {$($long_help)*});
         typeparam_gen_params!(($app.arg(arg.takes_value(false).required(false))) $($tail)*)
     }};
-    (($app:expr) ($facc:ident $F:ident $n:ident $T:ty {$($short:tt)*} {$($long:tt)*} {default $E:expr}) $($tail:tt)*) => {{
-        let arg = typeparam_gen_params_flg!((::clap::Arg::with_name(stringify!($n))) {$($short)*} {$($long)*});
+    (($app:expr) ($facc:ident $F:ident $n:ident $T:ty {$($short:tt)*} {$($long:tt)*} {default $E:expr} {$($help:tt)*} {$($long_help:tt)*}) $($tail:tt)*) => {{
+        let arg = typeparam_gen_params_flg!((::clap::Arg::with_name(stringify!($n))) {$($short)*} {$($long)*} {$($help)*} {$($long_help)*});
         typeparam_gen_params!(($app.arg(arg.takes_value(true).required(false))) $($tail)*)
     }};
-    (($app:expr) ($facc:ident $F:ident $n:ident $T:ty {$($short:tt)*} {$($long:tt)*} {optional}) $($tail:tt)*) => {{
-        let arg = typeparam_gen_params_flg!((::clap::Arg::with_name(stringify!($n))) {$($short)*} {$($long)*});
+    (($app:expr) ($facc:ident $F:ident $n:ident $T:ty {$($short:tt)*} {$($long:tt)*} {optional} {$($help:tt)*} {$($long_help:tt)*}) $($tail:tt)*) => {{
+        let arg = typeparam_gen_params_flg!((::clap::Arg::with_name(stringify!($n))) {$($short)*} {$($long)*} {$($help)*} {$($long_help)*});
         typeparam_gen_params!(($app.arg(arg.takes_value(true).required(false))) $($tail)*)
     }};
-    (($app:expr) ($facc:ident $F:ident $n:ident $T:ty {$($short:tt)*} {$($long:tt)*} {required}) $($tail:tt)*) => {{
-        let arg = typeparam_gen_params_flg!((::clap::Arg::with_name(stringify!($n))) {$($short)*} {$($long)*});
+    (($app:expr) ($facc:ident $F:ident $n:ident $T:ty {$($short:tt)*} {$($long:tt)*} {required} {$($help:tt)*} {$($long_help:tt)*}) $($tail:tt)*) => {{
+        let arg = typeparam_gen_params_flg!((::clap::Arg::with_name(stringify!($n))) {$($short)*} {$($long)*} {$($help)*} {$($long_help)*});
         typeparam_gen_params!(($app.arg(arg.takes_value(true).required(true))) $($tail)*)
     }};
-    (($app:expr) ($facc:ident $F:ident $n:ident $T:ty {$($short:tt)*} {$($long:tt)*} {option map $E:expr}) $($tail:tt)*) => {{
-        let arg = typeparam_gen_params_flg!((::clap::Arg::with_name(stringify!($n))) {$($short)*} {$($long)*});
+    (($app:expr) ($facc:ident $F:ident $n:ident $T:ty {$($short:tt)*} {$($long:tt)*} {option map $E:expr} {$($help:tt)*} {$($long_help:tt)*}) $($tail:tt)*) => {{
+        let arg = typeparam_gen_params_flg!((::clap::Arg::with_name(stringify!($n))) {$($short)*} {$($long)*} {$($help)*} {$($long_help)*});
         typeparam_gen_params!(($app.arg(arg.takes_value(true).required(false))) $($tail)*)
     }};
-    (($app:expr) ($facc:ident $F:ident $n:ident $T:ty {$($short:tt)*} {$($long:tt)*} {map $E:expr}) $($tail:tt)*) => {{
-        let arg = typeparam_gen_params_flg!((::clap::Arg::with_name(stringify!($n))) {$($short)*} {$($long)*});
+    (($app:expr) ($facc:ident $F:ident $n:ident $T:ty {$($short:tt)*} {$($long:tt)*} {map $E:expr} {$($help:tt)*} {$($long_help:tt)*}) $($tail:tt)*) => {{
+        let arg = typeparam_gen_params_flg!((::clap::Arg::with_name(stringify!($n))) {$($short)*} {$($long)*} {$($help)*} {$($long_help)*});
         typeparam_gen_params!(($app.arg(arg.takes_value(true).required(true))) $($tail)*)
     }};
     (($app:expr)) => {$app};
@@ -650,16 +675,16 @@ impl<T, E2, E : Into<E2>> From<Result<T, E>> for Res<T, E2> {
 #[doc(hidden)]
 #[macro_export]
 macro_rules! typeparam_gen_new_param_get {
-    (($match:expr) ($err:ty) $facc:ident $F:ident $n:ident $T:ty {$($short:tt)*} {$($long:tt)*} {flag}) => {
+    (($match:expr) ($err:ty) $facc:ident $F:ident $n:ident $T:ty {$($short:tt)*} {$($long:tt)*} {flag} {$($help:tt)*} {$($long_help:tt)*}) => {
         $match.is_present(stringify!($n))
     };
-    (($match:expr) ($err:ty) $facc:ident $F:ident $n:ident $T:ty {$($short:tt)*} {$($long:tt)*} {default $E:expr}) => {
+    (($match:expr) ($err:ty) $facc:ident $F:ident $n:ident $T:ty {$($short:tt)*} {$($long:tt)*} {default $E:expr} {$($help:tt)*} {$($long_help:tt)*}) => {
         $match.value_of(stringify!($n)).map_or_else(|| Ok($E), |val| val.parse::<$T>(),)?
     };
-    (($match:expr) ($err:ty) $facc:ident $F:ident $n:ident $T:ty {$($short:tt)*} {$($long:tt)*} {required}) => {
+    (($match:expr) ($err:ty) $facc:ident $F:ident $n:ident $T:ty {$($short:tt)*} {$($long:tt)*} {required} {$($help:tt)*} {$($long_help:tt)*}) => {
         $match.value_of(stringify!($n)).map(|val| val.parse::<$T>()).unwrap()?
     };
-    (($match:expr) ($err:ty) $facc:ident $F:ident $n:ident $T:ty {$($short:tt)*} {$($long:tt)*} {optional}) => {{
+    (($match:expr) ($err:ty) $facc:ident $F:ident $n:ident $T:ty {$($short:tt)*} {$($long:tt)*} {optional} {$($help:tt)*} {$($long_help:tt)*}) => {{
         use std::str::FromStr;
         trait OptionParse where Self : Sized {
             type Error;
@@ -679,13 +704,13 @@ macro_rules! typeparam_gen_new_param_get {
         }
         parse::<$T>($match.value_of(stringify!($n)))?
     }};
-    (($match:expr) ($err:ty) $facc:ident $F:ident $n:ident $T:ty {$($short:tt)*} {$($long:tt)*} {option map $E:expr}) => {{
+    (($match:expr) ($err:ty) $facc:ident $F:ident $n:ident $T:ty {$($short:tt)*} {$($long:tt)*} {option map $E:expr} {$($help:tt)*} {$($long_help:tt)*}) => {{
         fn coerce<R : Into<$crate::Res<$T, $err>>, F : FnOnce(Option<&str>) -> R>(f: F, val: Option<&str>) -> Result<$T, $err> {
             R::into(f(val)).0
         }
         coerce($E, $match.value_of(stringify!($n)))?
     }};
-    (($match:expr) ($err:ty) $facc:ident $F:ident $n:ident $T:ty {$($short:tt)*} {$($long:tt)*} {map $E:expr}) => {{
+    (($match:expr) ($err:ty) $facc:ident $F:ident $n:ident $T:ty {$($short:tt)*} {$($long:tt)*} {map $E:expr} {$($help:tt)*} {$($long_help:tt)*}) => {{
         fn coerce<R : Into<$crate::Res<$T, $err>>, F : FnOnce(&str) -> R>(f: F, val: &str) -> Result<$T, $err> {
             R::into(f(val)).0
         }
@@ -734,9 +759,9 @@ macro_rules! typeparam_gen_new {
     (($match:expr) $N:ident $err:ty {$($gen:tt)*} [subcommands => {} params => {$($params:tt)*}]) => {
         typeparam_gen_new!(($match) $N $err {$($gen)*} [params => { $($params)* }])
     };
-    (($match:expr) $N:ident $err:ty {$($gen:tt)*} [params => { ($facc:ident $F:ident $n:ident $T:ty {$($short:tt)*} {$($long:tt)*} {$($value:tt)*}) $($params:tt)*}]) => {{
+    (($match:expr) $N:ident $err:ty {$($gen:tt)*} [params => { ($facc:ident $F:ident $n:ident $T:ty {$($short:tt)*} {$($long:tt)*} {$($value:tt)*} {$($help:tt)*} {$($long_help:tt)*}) $($params:tt)*}]) => {{
         let mch = $match;
-        let val: $T = typeparam_gen_new_param_get!((mch) ($err) $facc $F $n $T {$($short)*} {$($long)*} {$($value)*});
+        let val: $T = typeparam_gen_new_param_get!((mch) ($err) $facc $F $n $T {$($short)*} {$($long)*} {$($value)*} {$($help)*} {$($long_help)*});
         typeparam_gen_new!((mch) $N $err {$($gen)* $F: val,} [params => { $($params)* }])
     }};
     (($match:expr) $N:ident $err:ty {$($gen:tt)*} [params => {}]) => {{
